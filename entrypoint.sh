@@ -26,29 +26,29 @@ fetch_packages() {
     while IFS= read -r GITHUB_REPO || [ -n "$GITHUB_REPO" ]; do
         echo "Processing repo: '$GITHUB_REPO'..."
 
-        # Fetch the latest .deb file URL
-        LATEST_DEB_URL=$(curl -s "https://api.github.com/repos/$GITHUB_REPO/releases/latest" | grep "browser_download_url" | grep ".deb" | cut -d '"' -f 4)
+        # Fetch all available .deb files from past releases
+        LATEST_DEB_URLS=$(curl -s "https://api.github.com/repos/$GITHUB_REPO/releases" | grep "browser_download_url" | grep ".deb" | cut -d '"' -f 4)
 
-        echo "Found URL: '$LATEST_DEB_URL'"
+        if [ -n "$LATEST_DEB_URLS" ]; then
+            for URL in $LATEST_DEB_URLS; do
+                FILE_NAME=$(basename "$URL")
 
-        if [ -n "$LATEST_DEB_URL" ]; then
-            FILE_NAME=$(basename "$LATEST_DEB_URL")
+                # Check if file already exists
+                if [ ! -f "$PACKAGE_DIR/$FILE_NAME" ]; then
+                    echo "Downloading $URL..."
+                    wget --verbose -P "$PACKAGE_DIR" "$URL"
 
-            # Check if file already exists
-            if [ ! -f "$PACKAGE_DIR/$FILE_NAME" ]; then
-                echo "Downloading $LATEST_DEB_URL..."
-                wget --verbose -P "$PACKAGE_DIR" "$LATEST_DEB_URL"
-
-                if [ $? -eq 0 ]; then
-                    echo "Download complete."
+                    if [ $? -eq 0 ]; then
+                        echo "Download complete."
+                    else
+                        echo "ERROR: Failed to download $URL"
+                    fi
                 else
-                    echo "ERROR: Failed to download $LATEST_DEB_URL"
+                    echo "File $FILE_NAME already exists, skipping download."
                 fi
-            else
-                echo "File $FILE_NAME already exists, skipping download."
-            fi
+            done
         else
-            echo "No .deb file found for $GITHUB_REPO."
+            echo "No .deb files found for $GITHUB_REPO."
         fi
     done < "$REPOS_FILE"
 
@@ -58,7 +58,7 @@ fetch_packages() {
         touch "$PACKAGE_DIR/override"
     fi
 
-    # Regenerate Packages.gz if there are .deb files
+    # Regenerate Packages.gz with all versions
     if find "$PACKAGE_DIR" -maxdepth 1 -type f -name "*.deb" | grep -q .; then
         echo "Generating Packages.gz..."
         dpkg-scanpackages "$PACKAGE_DIR" "$PACKAGE_DIR/override" | gzip -9c > "$PACKAGE_FILE"
