@@ -108,19 +108,19 @@ Description: Custom APT repository for Ubuntu
 Date: $(date -Ru)
 EOF
 
-            # Ajouter les checksums (MD5, SHA1, SHA256)
+            # Ajouter les checksums (MD5, SHA1, SHA256) avec chemins relatifs
             echo "Adding hash sums to Release file..."
             echo "" >> "$RELEASE_FILE"
             echo "MD5Sum:" >> "$RELEASE_FILE"
-            find "$BIN_DIR" -type f -exec md5sum {} \; | awk '{print $1, length($2), $2}' >> "$RELEASE_FILE"
+            find "$BIN_DIR" -type f -exec md5sum {} \; | sed "s|$PACKAGE_DIR|/packages|g" >> "$RELEASE_FILE"
 
             echo "" >> "$RELEASE_FILE"
             echo "SHA1:" >> "$RELEASE_FILE"
-            find "$BIN_DIR" -type f -exec sha1sum {} \; | awk '{print $1, length($2), $2}' >> "$RELEASE_FILE"
+            find "$BIN_DIR" -type f -exec sha1sum {} \; | sed "s|$PACKAGE_DIR|/packages|g" >> "$RELEASE_FILE"
 
             echo "" >> "$RELEASE_FILE"
             echo "SHA256:" >> "$RELEASE_FILE"
-            find "$BIN_DIR" -type f -exec sha256sum {} \; | awk '{print $1, length($2), $2}' >> "$RELEASE_FILE"
+            find "$BIN_DIR" -type f -exec sha256sum {} \; | sed "s|$PACKAGE_DIR|/packages|g" >> "$RELEASE_FILE"
 
             echo "Release file updated with hashes!"
         done
