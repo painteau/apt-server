@@ -48,7 +48,7 @@ fetch_packages() {
                 fi
             done
         else
-            echo "No .deb files found for $GITHUB_REPO."
+            echo "No .deb file found for $GITHUB_REPO."
         fi
     done < "$REPOS_FILE"
 
@@ -58,10 +58,12 @@ fetch_packages() {
         touch "$PACKAGE_DIR/override"
     fi
 
-    # Regenerate Packages.gz with all versions
+    # Regenerate Packages.gz with all versions and correct paths
     if find "$PACKAGE_DIR" -maxdepth 1 -type f -name "*.deb" | grep -q .; then
         echo "Generating Packages.gz with multiple version support..."
-        dpkg-scanpackages --multiversion "$PACKAGE_DIR" "$PACKAGE_DIR/override" | gzip -9c > "$PACKAGE_FILE"
+        dpkg-scanpackages --multiversion "$PACKAGE_DIR" "$PACKAGE_DIR/override" \
+            | sed "s|Filename: /usr/share/nginx/html/|Filename: |g" \
+            | gzip -9c > "$PACKAGE_FILE"
         echo "Packages.gz generated."
 
         # Remove unnecessary files
