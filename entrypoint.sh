@@ -5,82 +5,86 @@ PACKAGE_DIR="/usr/share/nginx/html/packages"
 PACKAGE_FILE="$PACKAGE_DIR/Packages.gz"
 GITHUB_REPO_LIST="painteau/apt-server"
 REPOS_FILE="$PACKAGE_DIR/repos.txt"
+SYNC_INTERVAL=300  # Sync every 5 minutes (300 seconds)
 
-# Clean up old package files
-rm -rf "$PACKAGE_DIR"/*.deb "$PACKAGE_FILE"
+fetch_packages() {
+    echo "Fetching repos.txt from $GITHUB_REPO_LIST..."
+    LATEST_REPOS_URL=$(curl -s "https://api.github.com/repos/$GITHUB_REPO_LIST/contents/repos.txt" | grep "download_url" | cut -d '"' -f 4)
 
-# Ensure the package directory exists and has proper permissions
-mkdir -p "$PACKAGE_DIR"
-chown -R nginx:nginx "$PACKAGE_DIR"
-chmod -R 775 "$PACKAGE_DIR"
-
-# Fetch repos.txt from the GitHub repository
-echo "Fetching repos.txt from $GITHUB_REPO_LIST..."
-LATEST_REPOS_URL=$(curl -s "https://api.github.com/repos/$GITHUB_REPO_LIST/contents/repos.txt" | grep "download_url" | cut -d '"' -f 4)
-
-if [ -n "$LATEST_REPOS_URL" ]; then
-    wget -O "$REPOS_FILE" "$LATEST_REPOS_URL"
-    echo "repos.txt downloaded."
-else
-    echo "Failed to fetch repos.txt. Exiting."
-    exit 1
-fi
-
-# Display the content of repos.txt for debugging
-echo "---- repos.txt content ----"
-cat "$REPOS_FILE"
-echo "----------------------------"
-
-# Download the latest .deb files for each repository listed in repos.txt
-while IFS= read -r GITHUB_REPO || [ -n "$GITHUB_REPO" ]; do
-    echo "Processing repo: '$GITHUB_REPO'..."
-
-    # Fetch the latest .deb file URL
-    LATEST_DEB_URL=$(curl -s "https://api.github.com/repos/$GITHUB_REPO/releases/latest" | grep "browser_download_url" | grep ".deb" | cut -d '"' -f 4)
-
-    echo "Found URL: '$LATEST_DEB_URL'"
-
-    if [ -n "$LATEST_DEB_URL" ]; then
-        echo "Downloading $LATEST_DEB_URL..."
-        
-        # Sleep to avoid API rate limits
-        sleep 2
-        
-        wget --verbose -P "$PACKAGE_DIR" "$LATEST_DEB_URL"
-
-        if [ $? -eq 0 ]; then
-            echo "Download complete."
-        else
-            echo "ERROR: Failed to download $LATEST_DEB_URL"
-        fi
+    if [ -n "$LATEST_REPOS_URL" ]; then
+        wget -q -O "$REPOS_FILE" "$LATEST_REPOS_URL"
+        echo "repos.txt downloaded."
     else
-        echo "No .deb file found for $GITHUB_REPO."
+        echo "Failed to fetch repos.txt. Exiting."
+        exit 1
     fi
-done < "$REPOS_FILE"
 
-# Generate Packages.gz if .deb files exist
-if find "$PACKAGE_DIR" -maxdepth 1 -type f -name "*.deb" | grep -q .; then
-    echo "Generating Packages.gz..."
-    
-    # Create an empty override file to avoid warnings
-    touch /usr/share/nginx/html/packages/override
+    echo "---- repos.txt content ----"
+    cat "$REPOS_FILE"
+    echo "----------------------------"
 
-    # Generate Packages.gz using the override file
-    dpkg-scanpackages "$PACKAGE_DIR" /usr/share/nginx/html/packages/override | gzip -9c > "$PACKAGE_FILE"
+    while IFS= read -r GITHUB_REPO || [ -n "$GITHUB_REPO" ]; do
+        echo "Processing repo: '$GITHUB_REPO'..."
 
-    echo "Packages.gz generated."
+        # Fetch the latest .deb file URL
+        LATEST_DEB_URL=$(curl -s "https://api.github.com/repos/$GITHUB_REPO/releases/latest" | grep "browser_download_url" | grep ".deb" | cut -d '"' -f 4)
 
-    # Remove unnecessary files
-    echo "Cleaning up unnecessary files..."
-    rm -f "$PACKAGE_DIR/override" "$PACKAGE_DIR/repos.txt"
+        echo "Found URL: '$LATEST_DEB_URL'"
 
-    echo "Cleanup complete."
-else
-    echo "No .deb files found. Skipping Packages.gz generation."
-fi
+        if [ -n "$LATEST_DEB_URL" ]; then
+            FILE_NAME=$(basename "$LATEST_DEB_URL")
 
-# Ensure correct permissions
-chown -R nginx:nginx "$PACKAGE_DIR"
+            # Check if file already exists
+            if [ ! -f "$PACKAGE_DIR/$FILE_NAME" ]; then
+                echo "Downloading $LATEST_DEB_URL..."
+                wget --verbose -P "$PACKAGE_DIR" "$LATEST_DEB_URL"
+
+                if [ $? -eq 0 ]; then
+                    echo "Download complete."
+                else
+                    echo "ERROR: Failed to download $LATEST_DEB_URL"
+                fi
+            else
+                echo "File $FILE_NAME already exists, skipping download."
+            fi
+        else
+            echo "No .deb file found for $GITHUB_REPO."
+        fi
+    done < "$REPOS_FILE"
+
+    # Ensure the override file exists before regenerating Packages.gz
+    if [ ! -f "$PACKAGE_DIR/override" ]; then
+        echo "Creating missing override file..."
+        touch "$PACKAGE_DIR/override"
+    fi
+
+    # Regenerate Packages.gz if there are .deb files
+    if find "$PACKAGE_DIR" -maxdepth 1 -type f -name "*.deb" | grep -q .; then
+        echo "Generating Packages.gz..."
+        dpkg-scanpackages "$PACKAGE_DIR" "$PACKAGE_DIR/override" | gzip -9c > "$PACKAGE_FILE"
+        echo "Packages.gz generated."
+
+        # Remove unnecessary files
+        echo "Cleaning up unnecessary files..."
+        rm -f "$PACKAGE_DIR/override" "$PACKAGE_DIR/repos.txt"
+        echo "Cleanup complete."
+    else
+        echo "No .deb files found. Skipping Packages.gz generation."
+    fi
+
+    # Ensure correct permissions
+    chown -R nginx:nginx "$PACKAGE_DIR"
+}
+
+# Initial package fetch
+fetch_packages
+
+# Start a background loop for periodic sync
+while true; do
+    echo "Waiting $SYNC_INTERVAL seconds before next sync..."
+    sleep "$SYNC_INTERVAL"
+    fetch_packages
+done &
 
 # Start Nginx
 exec "$@"
