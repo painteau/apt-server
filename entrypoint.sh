@@ -60,8 +60,8 @@ fetch_packages() {
 
     # Regenerate Packages.gz with all versions
     if find "$PACKAGE_DIR" -maxdepth 1 -type f -name "*.deb" | grep -q .; then
-        echo "Generating Packages.gz..."
-        dpkg-scanpackages "$PACKAGE_DIR" "$PACKAGE_DIR/override" | gzip -9c > "$PACKAGE_FILE"
+        echo "Generating Packages.gz with multiple version support..."
+        dpkg-scanpackages --multiversion "$PACKAGE_DIR" "$PACKAGE_DIR/override" | gzip -9c > "$PACKAGE_FILE"
         echo "Packages.gz generated."
 
         # Remove unnecessary files

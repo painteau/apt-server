@@ -1,134 +1,173 @@
-# apt-server
+# 📦 APT Server - Host Your Own Debian Package Repository
 
-**Status**: Work in Progress 🚧
+`apt-server` is a **self-hosted APT repository** that allows you to **distribute `.deb` packages** for Debian-based systems.
 
-A lightweight APT server built using Docker and Nginx (based on Alpine), capable of hosting Debian/Ubuntu packages. This repository automates the process of creating and deploying an APT server image with multi-platform support and GitHub Actions integration. The server also automatically generates the `Packages.gz` index file when the container starts.
+✅ **Automatically fetches `.deb` files** from GitHub releases.  
+✅ **Supports multiple versions** of each package.  
+✅ **Automatically regenerates `Packages.gz`** to keep the repo updated.  
+✅ **Served via Nginx** for easy access.  
 
----
+—
 
-## Features
+## 🚀 Getting Started
 
-- **Lightweight**: Uses Nginx on Alpine for minimal resource usage.
-- **Multi-Architecture Support**: Builds for `amd64`, `arm64`, and `arm/v7`.
-- **Automated CI/CD**: Docker images are built, pushed, and signed via GitHub Actions.
-- **APT-Compatible**: Serves `.deb` packages and `Packages.gz` indexes for APT clients.
-- **Automatic Package Indexing**: Automatically generates `Packages.gz` when the Docker container starts.
+### 1️⃣ Fork This Repository
+To customize your package sources, **fork this repository** on GitHub.  
+This allows you to modify `repos.txt` to define which packages should be included.
 
----
-
-## Usage
-
-### Clone the Repository
-
-```bash
-git clone https://github.com/painteau/apt-server.git
+### 2️⃣ Clone Your Fork
+```sh
+git clone https://github.com/YOUR_GITHUB_USERNAME/apt-server.git
 cd apt-server
 ```
 
-### Build and Run Locally
-
-1. **Build the Docker image:**
-   ```bash
-   docker build -t apt-server .
-   ```
-
-2. **Run the container:**
-   ```bash
-   docker run --name apt-server -p 8080:80 -v /path/to/your/packages:/usr/share/nginx/html/packages -d apt-server
-   ```
-
-### Use the APT Server on Clients
-
-1. **Add the APT server to your client machine:**
-   ```bash
-   echo "deb [trusted=yes] http://<host-ip>:8080/packages ./" | sudo tee -a /etc/apt/sources.list
-   sudo apt update
-   ```
-
-2. **Install your package:**
-   ```bash
-   sudo apt install <your-package>
-   ```
-
----
-
-## Preparing Your Packages
-
-When the Docker container starts, it automatically generates the `Packages.gz` index file for any `.deb` files located in `/path/to/your/packages`. Simply add or update `.deb` files in the mounted directory and restart the container if needed.
-
-1. **Place `.deb` files in your local directory:**
-   ```bash
-   mkdir -p /path/to/your/packages
-   mv your-package.deb /path/to/your/packages
-   ```
-
-2. **Restart the container (if needed):**
-   ```bash
-   docker restart apt-server
-   ```
-
----
-
-## GitHub Actions Workflow
-
-### Overview
-
-This repository includes a GitHub Actions workflow to automate the build, push, and signing of Docker images.
-
-### Key Features
-
-- **Triggers:**
-  - Scheduled builds every Monday at 08:08 (UTC).
-  - Builds on push to the `main` branch.
-  - Builds on version tags (e.g., `v1.0.0`).
-  - Builds on pull requests targeting `main`.
-
-- **Multi-Platform Builds:** Images are built for `amd64`, `arm64`, and `arm/v7`.
-
-- **Image Signing:** Docker images are signed using `cosign` for enhanced security.
-
-### How It Works
-
-1. **Build and Push:** The workflow builds a Docker image and pushes it to the GitHub Container Registry (`ghcr.io`).
-2. **Sign Images:** The workflow signs the published image using `cosign`.
-
-### Running the Workflow
-
-The workflow runs automatically on the specified triggers. To manually trigger it, you can use the "Run workflow" button in the Actions tab of your GitHub repository.
-
----
-
-## Docker Image
-
-The Docker image is published to:
-
-```
-ghcr.io/painteau/apt-server
+### 3️⃣ Build the Docker Image
+```sh
+docker build -t YOUR_USERNAME/apt-server .
 ```
 
-You can pull the latest image with:
-
-```bash
-docker pull ghcr.io/painteau/apt-server:latest
+### 4️⃣ Run the APT Server
+```sh
+docker run —name apt-server -p 3094:80 -d —label com.centurylinklabs.watchtower.enable=true YOUR_USERNAME/apt-server
+```
+✅ The APT repository will be available at:  
+```
+http://localhost:3094/packages/
 ```
 
----
+—
 
-## Roadmap
+## 📥 Adding `.deb` Packages
 
-- [ ] Add support for HTTPS with Let's Encrypt.
-- [ ] Improve documentation for advanced use cases.
-- [ ] Add integration tests for package serving.
+### 🔹 Step 1: Modify `repos.txt` in Your Fork
+The server pulls `.deb` files from **GitHub releases**.  
+In your fork, edit `repos.txt` to list repositories (one per line):
 
----
+```
+username/repo1
+username/repo2
+```
+📌 **These repositories must have `.deb` files in their latest releases.**
 
-## Contributions
+### 🔹 Step 2: Push Changes to Your Fork
+After modifying `repos.txt`, push the changes to GitHub:
+```sh
+git add repos.txt
+git commit -m “Updated package sources”
+git push origin main
+```
 
-Contributions are welcome! Feel free to open issues or submit pull requests to improve the project.
+### 🔹 Step 3: Restart the Server to Sync
+```sh
+docker restart apt-server
+```
+✅ New `.deb` packages will be downloaded **automatically** every 5 minutes.
 
----
+—
 
-## License
+## 🖥️ Using the APT Repository
 
-This project is licensed under the MIT License. See the `LICENSE` file for details.
+### 1️⃣ Add the APT Source
+On a Debian/Ubuntu system, add the repository:
+```sh
+echo “deb [trusted=yes] http://localhost:3094/ ./“ | sudo tee /etc/apt/sources.list.d/custom.list
+```
 
+### 2️⃣ Update APT
+```sh
+sudo apt update
+```
+
+### 3️⃣ Install a Package
+```sh
+sudo apt install package-name
+```
+📌 **By default, APT installs the latest version** of the package.
+
+—
+
+## 🏷 Installing Specific Versions
+
+### 1️⃣ List Available Versions
+```sh
+apt-cache madison package-name
+```
+✅ **Example output:**
+```
+package-name | 1.2.3 | http://localhost:3094 ./ Packages
+package-name | 1.2.2 | http://localhost:3094 ./ Packages
+package-name | 1.2.1 | http://localhost:3094 ./ Packages
+```
+
+### 2️⃣ Install a Specific Version
+```sh
+sudo apt install package-name=1.2.2
+```
+
+—
+
+## 🔄 How the Server Works
+
+1️⃣ **Every 5 minutes**, the server:
+   - Fetches the latest `repos.txt` from your GitHub fork.
+   - Downloads **all available `.deb` versions** from each repository.
+   - Regenerates `Packages.gz` for APT.
+   - Removes unnecessary files.
+
+2️⃣ **APT Clients can install packages** directly using `apt install package-name`.
+
+—
+
+## 🛠️ Advanced Configuration
+
+### 🔹 Change the Sync Interval
+By default, the server **syncs every 5 minutes** (`300s`).  
+To change it, modify **`entrypoint.sh`** in your fork:
+```sh
+SYNC_INTERVAL=600  # Sync every 10 minutes
+```
+
+### 🔹 Run the Server on a Different Port
+By default, the server runs on port **3094**. To change it:
+```sh
+docker run —name apt-server -p 8080:80 -d YOUR_USERNAME/apt-server
+```
+Now, the APT repository will be available at:
+```
+http://localhost:8080/packages/
+```
+
+—
+
+## 🛠 Troubleshooting
+
+### 🔹 Check Logs for Errors
+If the server is not working correctly, check the logs:
+```sh
+docker logs -f apt-server
+```
+
+### 🔹 Verify `.deb` Files Are Downloaded
+```sh
+docker exec apt-server ls -l /usr/share/nginx/html/packages
+```
+✅ You should see multiple `.deb` files listed.
+
+### 🔹 Force a Manual Sync
+If new packages are not appearing, trigger a manual sync:
+```sh
+docker exec apt-server sh -c “fetch_packages”
+```
+
+—
+
+## 🚀 Contributing
+1️⃣ **Fork the repository**  
+2️⃣ **Modify `repos.txt` and push changes**  
+3️⃣ **Submit a pull request if you have general improvements**  
+
+—
+
+## 📝 License
+This project is licensed under the **MIT License**.  
+Feel free to use, modify, and distribute it!
