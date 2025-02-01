@@ -85,8 +85,9 @@ generate_metadata() {
             mkdir -p "$BIN_DIR"
 
             echo "Generating Packages.gz for $DIST $ARCH..."
-            dpkg-scanpackages --multiversion "$PACKAGE_DIR/pool/main" "$PACKAGE_DIR/$OVERRIDE_FILE" | gzip -9c > "$BIN_DIR/Packages.gz"
-            dpkg-scanpackages --multiversion "$PACKAGE_DIR/pool/main" "$PACKAGE_DIR/$OVERRIDE_FILE" > "$BIN_DIR/Packages"
+dpkg-scanpackages --multiversion "$PACKAGE_DIR/pool/main" "$OVERRIDE_FILE" | gzip -9c > "$BIN_DIR/Packages.gz"
+dpkg-scanpackages --multiversion "$PACKAGE_DIR/pool/main" "$OVERRIDE_FILE" > "$BIN_DIR/Packages"
+
 
             echo "Generating Release file for $DIST..."
             RELEASE_FILE="$PACKAGE_DIR/dists/$DIST/Release"
