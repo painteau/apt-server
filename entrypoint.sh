@@ -82,7 +82,6 @@ generate_override() {
     done
 }
 
-# 📝 **Generate `Packages.gz` and `Release`**
 generate_metadata() {
     echo "Generating repository metadata..."
 
@@ -95,7 +94,9 @@ generate_metadata() {
             dpkg-scanpackages --multiversion "$PACKAGE_DIR/pool/main" "$OVERRIDE_FILE" > "$BIN_DIR/Packages"
 
             echo "Generating Release file for $DIST..."
-            cat <<EOF > "$PACKAGE_DIR/dists/$DIST/Release"
+            RELEASE_FILE="$PACKAGE_DIR/dists/$DIST/Release"
+
+            cat <<EOF > "$RELEASE_FILE"
 Origin: Gochu APT Server
 Label: Gochu Repository
 Suite: stable
@@ -106,15 +107,29 @@ Components: main
 Description: Custom APT repository for Ubuntu
 Date: $(date -Ru)
 EOF
+
+            # Ajouter les checksums (MD5, SHA1, SHA256)
+            echo "Adding hash sums to Release file..."
+            echo "" >> "$RELEASE_FILE"
+            echo "MD5Sum:" >> "$RELEASE_FILE"
+            find "$BIN_DIR" -type f -exec md5sum {} \; | awk '{print $1, length($2), $2}' >> "$RELEASE_FILE"
+
+            echo "" >> "$RELEASE_FILE"
+            echo "SHA1:" >> "$RELEASE_FILE"
+            find "$BIN_DIR" -type f -exec sha1sum {} \; | awk '{print $1, length($2), $2}' >> "$RELEASE_FILE"
+
+            echo "" >> "$RELEASE_FILE"
+            echo "SHA256:" >> "$RELEASE_FILE"
+            find "$BIN_DIR" -type f -exec sha256sum {} \; | awk '{print $1, length($2), $2}' >> "$RELEASE_FILE"
+
+            echo "Release file updated with hashes!"
         done
     done
 
     echo "Metadata generation complete."
 
-    # 🗑️ Clean up `override` after metadata generation
+    # Nettoyage après génération
     rm -f "$OVERRIDE_FILE"
-
-    # Ensure correct permissions
     chown -R nginx:nginx "$PACKAGE_DIR"
 }
 
