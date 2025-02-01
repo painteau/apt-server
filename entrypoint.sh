@@ -8,6 +8,7 @@ OVERRIDE_FILE="$PACKAGE_DIR/override"
 SYNC_INTERVAL=300  # Sync every 5 minutes (300 seconds)
 UBUNTU_VERSIONS="bionic focal jammy noble"
 ARCHITECTURES="amd64 arm64"
+GPG_KEY="Gochu APT Server"  # Nom de ta clé GPG
 
 # 🏗️ **Create repository structure**
 create_repo_structure() {
@@ -32,10 +33,6 @@ fetch_packages() {
         exit 1
     fi
 
-    echo "---- repos.txt content ----"
-    cat "$REPOS_FILE"
-    echo "----------------------------"
-
     while IFS= read -r GITHUB_REPO || [ -n "$GITHUB_REPO" ]; do
         echo "Processing repo: '$GITHUB_REPO'..."
 
@@ -48,12 +45,7 @@ fetch_packages() {
                 if [ ! -f "$PACKAGE_DIR/pool/main/$FILE_NAME" ]; then
                     echo "Downloading $URL..."
                     wget --verbose -P "$PACKAGE_DIR/pool/main" "$URL"
-
-                    if [ $? -eq 0 ]; then
-                        echo "Download complete."
-                    else
-                        echo "ERROR: Failed to download $URL"
-                    fi
+                    echo "Download complete."
                 else
                     echo "File $FILE_NAME already exists, skipping download."
                 fi
@@ -63,14 +55,13 @@ fetch_packages() {
         fi
     done < "$REPOS_FILE"
 
-    # 🗑️ Clean up `repos.txt`
     rm -f "$REPOS_FILE"
 }
 
 # 📝 **Generate `override` file**
 generate_override() {
     echo "Regenerating override file..."
-    > "$OVERRIDE_FILE"  # Clear the file
+    > "$OVERRIDE_FILE"
 
     find "$PACKAGE_DIR/pool/main" -maxdepth 1 -type f -name "*.deb" | while read DEB_FILE; do
         PACKAGE_NAME=$(dpkg-deb --show --showformat='${Package}\n' "$DEB_FILE")
@@ -82,6 +73,7 @@ generate_override() {
     done
 }
 
+# 📦 **Generate repository metadata and sign**
 generate_metadata() {
     echo "Generating repository metadata..."
 
@@ -108,7 +100,7 @@ Description: Custom APT repository for Ubuntu
 Date: $(date -Ru)
 EOF
 
-            # Ajouter les checksums (MD5, SHA1, SHA256) avec les chemins attendus par APT
+            # Ajouter les checksums (MD5, SHA1, SHA256) avec chemins relatifs
             echo "Adding hash sums to Release file..."
             echo "" >> "$RELEASE_FILE"
             echo "MD5Sum:" >> "$RELEASE_FILE"
@@ -122,7 +114,14 @@ EOF
             echo "SHA256:" >> "$RELEASE_FILE"
             find "$PACKAGE_DIR/$BIN_DIR" -type f -exec sha256sum {} \; | sed "s|$PACKAGE_DIR/||g" >> "$RELEASE_FILE"
 
-            echo "Release file updated with correct hashes!"
+            echo "Release file updated with hashes!"
+
+            # 🛡️ **Sign the Release file to create InRelease and Release.gpg**
+            echo "Signing Release file to create InRelease..."
+            gpg --default-key "$GPG_KEY" --clearsign -o "$PACKAGE_DIR/dists/$DIST/InRelease" "$RELEASE_FILE"
+
+            echo "Signing Release file to create Release.gpg..."
+            gpg --default-key "$GPG_KEY" -abs -o "$PACKAGE_DIR/dists/$DIST/Release.gpg" "$RELEASE_FILE"
         done
     done
 
