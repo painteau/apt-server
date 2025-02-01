@@ -87,11 +87,11 @@ generate_metadata() {
 
     for DIST in $UBUNTU_VERSIONS; do
         for ARCH in $ARCHITECTURES; do
-            BIN_DIR="$PACKAGE_DIR/dists/$DIST/main/binary-$ARCH"
+            BIN_DIR="dists/$DIST/main/binary-$ARCH"
 
             echo "Generating Packages.gz for $DIST $ARCH..."
-            dpkg-scanpackages --multiversion "$PACKAGE_DIR/pool/main" "$OVERRIDE_FILE" | gzip -9c > "$BIN_DIR/Packages.gz"
-            dpkg-scanpackages --multiversion "$PACKAGE_DIR/pool/main" "$OVERRIDE_FILE" > "$BIN_DIR/Packages"
+            dpkg-scanpackages --multiversion "pool/main" "$OVERRIDE_FILE" | gzip -9c > "$PACKAGE_DIR/$BIN_DIR/Packages.gz"
+            dpkg-scanpackages --multiversion "pool/main" "$OVERRIDE_FILE" > "$PACKAGE_DIR/$BIN_DIR/Packages"
 
             echo "Generating Release file for $DIST..."
             RELEASE_FILE="$PACKAGE_DIR/dists/$DIST/Release"
@@ -108,21 +108,21 @@ Description: Custom APT repository for Ubuntu
 Date: $(date -Ru)
 EOF
 
-            # Ajouter les checksums (MD5, SHA1, SHA256) avec chemins relatifs
+            # Ajouter les checksums (MD5, SHA1, SHA256) avec les chemins attendus par APT
             echo "Adding hash sums to Release file..."
             echo "" >> "$RELEASE_FILE"
             echo "MD5Sum:" >> "$RELEASE_FILE"
-            find "$BIN_DIR" -type f -exec md5sum {} \; | sed "s|$PACKAGE_DIR|/packages|g" >> "$RELEASE_FILE"
+            find "$PACKAGE_DIR/$BIN_DIR" -type f -exec md5sum {} \; | sed "s|$PACKAGE_DIR/||g" >> "$RELEASE_FILE"
 
             echo "" >> "$RELEASE_FILE"
             echo "SHA1:" >> "$RELEASE_FILE"
-            find "$BIN_DIR" -type f -exec sha1sum {} \; | sed "s|$PACKAGE_DIR|/packages|g" >> "$RELEASE_FILE"
+            find "$PACKAGE_DIR/$BIN_DIR" -type f -exec sha1sum {} \; | sed "s|$PACKAGE_DIR/||g" >> "$RELEASE_FILE"
 
             echo "" >> "$RELEASE_FILE"
             echo "SHA256:" >> "$RELEASE_FILE"
-            find "$BIN_DIR" -type f -exec sha256sum {} \; | sed "s|$PACKAGE_DIR|/packages|g" >> "$RELEASE_FILE"
+            find "$PACKAGE_DIR/$BIN_DIR" -type f -exec sha256sum {} \; | sed "s|$PACKAGE_DIR/||g" >> "$RELEASE_FILE"
 
-            echo "Release file updated with hashes!"
+            echo "Release file updated with correct hashes!"
         done
     done
 
