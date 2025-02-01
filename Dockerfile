@@ -1,21 +1,24 @@
 FROM nginx:alpine
 
-# Installer les outils nécessaires
+# Install necessary tools
 RUN apk add --no-cache dpkg dpkg-dev curl wget tar zstd
 
-# Créer le dossier pour les paquets
+# Create the package directory
 RUN mkdir -p /usr/share/nginx/html/packages
 
-# Copier l'entrée de script
+# Remove default index.html to enable directory listing
+RUN rm -f /usr/share/nginx/html/index.html
+
+# Copy the entrypoint script
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
-# Copier la configuration de Nginx
+# Copy the Nginx configuration
 COPY nginx.conf /etc/nginx/nginx.conf
 
-# Exposer le port HTTP
+# Expose HTTP port
 EXPOSE 80
 
-# Définir l'entrée du conteneur
+# Set custom entrypoint
 ENTRYPOINT ["/entrypoint.sh"]
 CMD ["nginx", "-g", "daemon off;"]

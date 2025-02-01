@@ -6,15 +6,15 @@ PACKAGE_FILE="$PACKAGE_DIR/Packages.gz"
 GITHUB_REPO_LIST="painteau/apt-server"
 REPOS_FILE="$PACKAGE_DIR/repos.txt"
 
-# Nettoyage des anciens fichiers
+# Clean up old package files
 rm -rf "$PACKAGE_DIR"/*.deb "$PACKAGE_FILE"
 
-# Vérifier que le dossier est accessible
+# Ensure the package directory exists and has proper permissions
 mkdir -p "$PACKAGE_DIR"
 chown -R nginx:nginx "$PACKAGE_DIR"
 chmod -R 775 "$PACKAGE_DIR"
 
-# Récupérer repos.txt
+# Fetch repos.txt from the GitHub repository
 echo "Fetching repos.txt from $GITHUB_REPO_LIST..."
 LATEST_REPOS_URL=$(curl -s "https://api.github.com/repos/$GITHUB_REPO_LIST/contents/repos.txt" | grep "download_url" | cut -d '"' -f 4)
 
@@ -26,15 +26,16 @@ else
     exit 1
 fi
 
+# Display the content of repos.txt for debugging
 echo "---- repos.txt content ----"
 cat "$REPOS_FILE"
 echo "----------------------------"
 
-# Télécharger les fichiers .deb
+# Download the latest .deb files for each repository listed in repos.txt
 while IFS= read -r GITHUB_REPO || [ -n "$GITHUB_REPO" ]; do
     echo "Processing repo: '$GITHUB_REPO'..."
 
-    # Récupérer l’URL du dernier .deb
+    # Fetch the latest .deb file URL
     LATEST_DEB_URL=$(curl -s "https://api.github.com/repos/$GITHUB_REPO/releases/latest" | grep "browser_download_url" | grep ".deb" | cut -d '"' -f 4)
 
     echo "Found URL: '$LATEST_DEB_URL'"
@@ -42,7 +43,7 @@ while IFS= read -r GITHUB_REPO || [ -n "$GITHUB_REPO" ]; do
     if [ -n "$LATEST_DEB_URL" ]; then
         echo "Downloading $LATEST_DEB_URL..."
         
-        # Forcer un délai pour éviter d'être bloqué par GitHub
+        # Sleep to avoid API rate limits
         sleep 2
         
         wget --verbose -P "$PACKAGE_DIR" "$LATEST_DEB_URL"
@@ -57,17 +58,23 @@ while IFS= read -r GITHUB_REPO || [ -n "$GITHUB_REPO" ]; do
     fi
 done < "$REPOS_FILE"
 
-# Vérifier si des .deb ont été téléchargés
+# Generate Packages.gz if .deb files exist
 if find "$PACKAGE_DIR" -maxdepth 1 -type f -name "*.deb" | grep -q .; then
     echo "Generating Packages.gz..."
-    dpkg-scanpackages "$PACKAGE_DIR" /dev/null | gzip -9c > "$PACKAGE_FILE"
+    
+    # Create an empty override file to avoid warnings
+    touch /usr/share/nginx/html/packages/override
+
+    # Generate Packages.gz using the override file
+    dpkg-scanpackages "$PACKAGE_DIR" /usr/share/nginx/html/packages/override | gzip -9c > "$PACKAGE_FILE"
+
     echo "Packages.gz generated."
 else
     echo "No .deb files found. Skipping Packages.gz generation."
 fi
 
-# Correction des permissions
+# Ensure correct permissions
 chown -R nginx:nginx "$PACKAGE_DIR"
 
-# Démarrer Nginx
+# Start Nginx
 exec "$@"
