@@ -69,6 +69,12 @@ if find "$PACKAGE_DIR" -maxdepth 1 -type f -name "*.deb" | grep -q .; then
     dpkg-scanpackages "$PACKAGE_DIR" /usr/share/nginx/html/packages/override | gzip -9c > "$PACKAGE_FILE"
 
     echo "Packages.gz generated."
+
+    # Remove unnecessary files
+    echo "Cleaning up unnecessary files..."
+    rm -f "$PACKAGE_DIR/override" "$PACKAGE_DIR/repos.txt"
+
+    echo "Cleanup complete."
 else
     echo "No .deb files found. Skipping Packages.gz generation."
 fi

@@ -6,8 +6,8 @@ RUN apk add --no-cache dpkg dpkg-dev curl wget tar zstd
 # Create the package directory
 RUN mkdir -p /usr/share/nginx/html/packages
 
-# Remove default index.html to enable directory listing
-RUN rm -f /usr/share/nginx/html/index.html
+# Remove default Nginx pages (index.html and 50x.html)
+RUN rm -f /usr/share/nginx/html/index.html /usr/share/nginx/html/50x.html
 
 # Copy the entrypoint script
 COPY entrypoint.sh /entrypoint.sh
