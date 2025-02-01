@@ -1,7 +1,7 @@
 FROM nginx:alpine
 
 # Install required tools
-RUN apk add --no-cache dpkg
+RUN apk add --no-cache dpkg-dev curl wget
 
 # Create directory for packages
 RUN mkdir -p /usr/share/nginx/html/packages
