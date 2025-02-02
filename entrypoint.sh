@@ -8,7 +8,6 @@ OVERRIDE_FILE="$PACKAGE_DIR/override"
 SYNC_INTERVAL=300  # Sync every 5 minutes (300 seconds)
 UBUNTU_VERSIONS="bionic focal jammy noble"
 ARCHITECTURES="amd64 arm64"
-GPG_KEY="Gochu APT Server"  # Nom de ta clé GPG
 
 # 🏗️ **Create repository structure**
 create_repo_structure() {
@@ -51,7 +50,7 @@ fetch_packages() {
                 fi
             done
         else
-            echo "No .deb file found for $GITHUB_REPO."
+            echo "No .deb files found for $GITHUB_REPO."
         fi
     done < "$REPOS_FILE"
 
@@ -73,7 +72,7 @@ generate_override() {
     done
 }
 
-# 📦 **Generate repository metadata and sign**
+# 📦 **Generate repository metadata**
 generate_metadata() {
     echo "Generating repository metadata..."
 
@@ -81,13 +80,12 @@ generate_metadata() {
         for ARCH in $ARCHITECTURES; do
             BIN_DIR="$PACKAGE_DIR/dists/$DIST/main/binary-$ARCH"
 
-            # ✅ **S'assurer que les répertoires existent**
+            # ✅ **Ensure directories exist**
             mkdir -p "$BIN_DIR"
 
             echo "Generating Packages.gz for $DIST $ARCH..."
-dpkg-scanpackages --multiversion "$PACKAGE_DIR/pool/main" "$OVERRIDE_FILE" | gzip -9c > "$BIN_DIR/Packages.gz"
-dpkg-scanpackages --multiversion "$PACKAGE_DIR/pool/main" "$OVERRIDE_FILE" > "$BIN_DIR/Packages"
-
+            dpkg-scanpackages "$PACKAGE_DIR/pool/main" "$OVERRIDE_FILE" | gzip -9c > "$BIN_DIR/Packages.gz"
+            dpkg-scanpackages "$PACKAGE_DIR/pool/main" "$OVERRIDE_FILE" > "$BIN_DIR/Packages"
 
             echo "Generating Release file for $DIST..."
             RELEASE_FILE="$PACKAGE_DIR/dists/$DIST/Release"
@@ -104,7 +102,7 @@ Description: Custom APT repository for Ubuntu
 Date: $(date -Ru)
 EOF
 
-            # ✅ **Ajouter les checksums (MD5, SHA1, SHA256)**
+            # ✅ **Add checksums (MD5, SHA1, SHA256)**
             echo "Adding hash sums to Release file..."
             echo "" >> "$RELEASE_FILE"
             echo "MD5Sum:" >> "$RELEASE_FILE"
@@ -119,19 +117,12 @@ EOF
             find "$BIN_DIR" -type f -exec sha256sum {} \; | awk '{print $1, length($2), $2}' >> "$RELEASE_FILE"
 
             echo "Release file updated with hashes!"
-
-            # 🛡️ **Sign the Release file to create InRelease and Release.gpg**
-            echo "Signing Release file to create InRelease..."
-            gpg --default-key "$GPG_KEY" --clearsign -o "$PACKAGE_DIR/dists/$DIST/InRelease" "$RELEASE_FILE"
-
-            echo "Signing Release file to create Release.gpg..."
-            gpg --default-key "$GPG_KEY" -abs -o "$PACKAGE_DIR/dists/$DIST/Release.gpg" "$RELEASE_FILE"
         done
     done
 
     echo "Metadata generation complete."
 
-    # ✅ **Nettoyage**
+    # ✅ **Cleanup**
     rm -f "$OVERRIDE_FILE"
     chown -R nginx:nginx "$PACKAGE_DIR"
 }
