@@ -11,31 +11,33 @@ ARCHITECTURES="amd64 arm64"
 
 # 🔄 **Load environment variables**
 if [ -f /root/.env ]; then
-    echo "Loading environment variables from /root/.env..."
-    export $(grep -v '^#' /root/.env | xargs -d '\n')
+    echo "📥 Loading environment variables from /root/.env..."
+    set -a
+    . /root/.env
+    set +a
 else
     echo "❌ ERROR: /root/.env file not found! Exiting..."
     exit 1
 fi
 
-# 🔑 **Import GPG Key**
-if [ -n "$GPG_PRIVATE_KEY" ] && [ -n "$GPG_KEY_ID" ]; then
-    echo "Importing GPG key..."
-    echo "$GPG_PRIVATE_KEY" | tr ' ' '\n' > /root/gpg_key.asc
-    gpg --batch --import /root/gpg_key.asc
-
-    # Vérification si l'importation a fonctionné
-    if ! gpg --list-keys "$GPG_KEY_ID" >/dev/null 2>&1; then
-        echo "❌ ERROR: GPG key import failed! Exiting..."
-        exit 1
-    fi
-
-    rm -f /root/gpg_key.asc  # Nettoyage du fichier temporaire
-    echo "✅ GPG key successfully imported."
-else
+# 🔑 **Check GPG Key**
+if [ -z "$GPG_PRIVATE_KEY" ] || [ -z "$GPG_KEY_ID" ]; then
     echo "❌ ERROR: GPG_PRIVATE_KEY or GPG_KEY_ID is missing! Exiting..."
     exit 1
 fi
+
+# 🔑 **Import GPG Key**
+echo "🔑 Importing GPG key..."
+echo "$GPG_PRIVATE_KEY" | tr ' ' '\n' > /root/gpg_key.asc
+gpg --batch --import /root/gpg_key.asc
+
+if ! gpg --list-keys "$GPG_KEY_ID" >/dev/null 2>&1; then
+    echo "❌ ERROR: GPG key import failed! Exiting..."
+    exit 1
+fi
+
+rm -f /root/gpg_key.asc
+echo "✅ GPG key successfully imported."
 
 # 🏗️ **Create repository structure**
 create_repo_structure() {
