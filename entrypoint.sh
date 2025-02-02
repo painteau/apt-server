@@ -133,5 +133,5 @@ while true; do
     generate_metadata
 done &
 
-# 🚀 **Start Nginx**
+# 🚀 **Start Nginx*
 exec "$@"
