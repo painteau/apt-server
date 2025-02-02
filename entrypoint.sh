@@ -28,8 +28,9 @@ fi
 
 # 🔑 **Import GPG Key**
 echo "🔑 Importing GPG key..."
-echo "$GPG_PRIVATE_KEY" | tr ' ' '\n' > /root/gpg_key.asc
+echo "$GPG_PRIVATE_KEY" | sed 's/\\n/\n/g' > /root/gpg_key.asc
 gpg --batch --import /root/gpg_key.asc
+rm -f /root/gpg_key.asc
 
 if ! gpg --list-keys "$GPG_KEY_ID" >/dev/null 2>&1; then
     echo "❌ ERROR: GPG key import failed! Exiting..."
