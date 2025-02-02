@@ -86,6 +86,8 @@ generate_metadata() {
             echo "Generating Packages.gz for $DIST $ARCH..."
             dpkg-scanpackages --multiversion "$PACKAGE_DIR/pool/main" "$OVERRIDE_FILE" | gzip -9c > "$BIN_DIR/Packages.gz"
             dpkg-scanpackages --multiversion "$PACKAGE_DIR/pool/main" "$OVERRIDE_FILE" > "$BIN_DIR/Packages"
+            bzip2 -9k "$BIN_DIR/Packages"
+            xz -9k "$BIN_DIR/Packages"
 
             echo "Generating Release file for $DIST..."
             RELEASE_FILE="$PACKAGE_DIR/dists/$DIST/Release"
@@ -104,19 +106,22 @@ EOF
 
             # ✅ **Add checksums (MD5, SHA1, SHA256)**
             echo "Adding hash sums to Release file..."
-            echo "" >> "$RELEASE_FILE"
-            echo "MD5Sum:" >> "$RELEASE_FILE"
-            find "$BIN_DIR" -type f -exec md5sum {} \; | awk '{print $1, length($2), $2}' >> "$RELEASE_FILE"
-
-            echo "" >> "$RELEASE_FILE"
-            echo "SHA1:" >> "$RELEASE_FILE"
-            find "$BIN_DIR" -type f -exec sha1sum {} \; | awk '{print $1, length($2), $2}' >> "$RELEASE_FILE"
-
-            echo "" >> "$RELEASE_FILE"
-            echo "SHA256:" >> "$RELEASE_FILE"
-            find "$BIN_DIR" -type f -exec sha256sum {} \; | awk '{print $1, length($2), $2}' >> "$RELEASE_FILE"
+            {
+                echo "MD5Sum:"
+                find "$BIN_DIR" -type f -exec md5sum {} \; | awk '{print $1, length($2), substr($2, index($2, "dists/"))}'
+                echo ""
+                echo "SHA1:"
+                find "$BIN_DIR" -type f -exec sha1sum {} \; | awk '{print $1, length($2), substr($2, index($2, "dists/"))}'
+                echo ""
+                echo "SHA256:"
+                find "$BIN_DIR" -type f -exec sha256sum {} \; | awk '{print $1, length($2), substr($2, index($2, "dists/"))}'
+            } >> "$RELEASE_FILE"
 
             echo "Release file updated with hashes!"
+
+            # ✅ **Create empty InRelease and Release.gpg to prevent 404 errors**
+            touch "$PACKAGE_DIR/dists/$DIST/InRelease"
+            touch "$PACKAGE_DIR/dists/$DIST/Release.gpg"
         done
     done
 
