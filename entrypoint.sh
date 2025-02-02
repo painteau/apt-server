@@ -9,6 +9,20 @@ SYNC_INTERVAL=300  # Sync every 5 minutes (300 seconds)
 UBUNTU_VERSIONS="bionic focal jammy noble"
 ARCHITECTURES="amd64 arm64"
 
+# Load environment variables if available
+if [ -f /root/.env ]; then
+    echo "Loading environment variables from /root/.env..."
+    export $(grep -v '^#' /root/.env | xargs)
+fi
+
+# Import GPG key if available
+if [ -n "$GPG_PRIVATE_KEY" ] && [ -n "$GPG_KEY_ID" ]; then
+    echo "Importing GPG key..."
+    echo "$GPG_PRIVATE_KEY" | gpg --batch --import
+else
+    echo "WARNING: No GPG key provided. The repository will not be signed!"
+fi
+
 # 🏗️ **Create repository structure**
 create_repo_structure() {
     echo "Creating repository structure..."
@@ -82,12 +96,17 @@ generate_metadata() {
         for ARCH in $ARCHITECTURES; do
             BIN_DIR="$PACKAGE_DIR/dists/$DIST/main/binary-$ARCH"
 
-            # ✅ **Ensure directories exist**
             mkdir -p "$BIN_DIR"
 
             echo "Generating Packages.gz for $DIST $ARCH..."
-            dpkg-scanpackages --multiversion "$PACKAGE_DIR/pool/main" "$OVERRIDE_FILE" | gzip -9c > "$BIN_DIR/Packages.gz" || echo "WARNING: dpkg-scanpackages failed!"
-            dpkg-scanpackages --multiversion "$PACKAGE_DIR/pool/main" "$OVERRIDE_FILE" > "$BIN_DIR/Packages" || echo "WARNING: dpkg-scanpackages failed!"
+            if [ "$(ls -A "$PACKAGE_DIR/pool/main"/*.deb 2>/dev/null)" ]; then
+                dpkg-scanpackages --multiversion "$PACKAGE_DIR/pool/main" "$OVERRIDE_FILE" | gzip -9c > "$BIN_DIR/Packages.gz"
+                dpkg-scanpackages --multiversion "$PACKAGE_DIR/pool/main" "$OVERRIDE_FILE" > "$BIN_DIR/Packages"
+            else
+                echo "WARNING: No .deb files found, skipping package index."
+                > "$BIN_DIR/Packages.gz"
+                > "$BIN_DIR/Packages"
+            fi
 
             echo "Generating Release file for $DIST..."
             RELEASE_FILE="$PACKAGE_DIR/dists/$DIST/Release"
@@ -104,7 +123,6 @@ Description: Custom APT repository for Ubuntu
 Date: $(date -Ru)
 EOF
 
-            # ✅ **Add checksums (MD5, SHA1, SHA256)**
             echo "Adding hash sums to Release file..."
             echo "MD5Sum:" >> "$RELEASE_FILE"
             find "$BIN_DIR" -type f -exec md5sum {} \; | awk '{print $1, length($2), substr($2, index($2, "dists/"))}' >> "$RELEASE_FILE"
@@ -119,8 +137,6 @@ EOF
 
             # 🛡️ **Sign the Release file (if GPG key is available)**
             if [ -n "$GPG_PRIVATE_KEY" ] && [ -n "$GPG_KEY_ID" ]; then
-                echo "Importing GPG key..."
-                echo "$GPG_PRIVATE_KEY" | gpg --batch --import
                 echo "Signing Release file..."
                 gpg --batch --yes --local-user "$GPG_KEY_ID" --clearsign -o "$PACKAGE_DIR/dists/$DIST/InRelease" "$RELEASE_FILE"
                 gpg --batch --yes --local-user "$GPG_KEY_ID" -abs -o "$PACKAGE_DIR/dists/$DIST/Release.gpg" "$RELEASE_FILE"
