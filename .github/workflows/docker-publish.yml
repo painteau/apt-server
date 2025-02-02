@@ -25,6 +25,29 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      # 🔹 Import GPG Key
+      - name: Import GPG key
+        run: |
+          echo "${{ secrets.GPG_PRIVATE_KEY }}" | gpg --import
+          gpg --list-secret-keys --keyid-format=long
+        env:
+          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+
+      # 🔹 Génération des fichiers Release signés
+      - name: Sign APT repository files
+        run: |
+          GPG_KEY_ID=${{ secrets.GPG_KEY_ID }}
+
+          if [ -z "$GPG_KEY_ID" ]; then
+              echo "ERROR: No GPG key ID found! Exiting..."
+              exit 1
+          fi
+
+          echo "Signing repository with GPG key: $GPG_KEY_ID"
+
+          gpg --batch --yes --local-user "$GPG_KEY_ID" --clearsign -o /usr/share/nginx/html/packages/dists/jammy/InRelease /usr/share/nginx/html/packages/dists/jammy/Release
+          gpg --batch --yes --local-user "$GPG_KEY_ID" -abs -o /usr/share/nginx/html/packages/dists/jammy/Release.gpg /usr/share/nginx/html/packages/dists/jammy/Release
+
       - name: Install cosign
         if: github.event_name != 'pull_request'
         uses: sigstore/cosign-installer@v3.7.0
